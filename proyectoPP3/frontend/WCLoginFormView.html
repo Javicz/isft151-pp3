@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Test Login</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="w3-light-grey">
+    <wc-login-form-view></wc-login-form-view>
+</body>
+<script>
+function createIcon(classes) {
+    var icon = document.createElement("i");
+    if (classes && classes.length > 0) {
+        icon.classList.add.apply(icon.classList, classes);
+    }
+    return icon;
+}
+
+function createButton(iconClasses, buttonClasses) {
+    var button = document.createElement("button");
+    button.type = "button";
+    if (buttonClasses) {
+        button.classList.add.apply(button.classList, buttonClasses);
+    } else {
+        button.classList.add("w3-button", "w3-large", "w3-opacity-min");
+    }
+    if (iconClasses) {
+        button.appendChild(createIcon(iconClasses));
+    }
+    return button;
+}
+
+function createLoginForm() {
+    // 1. Crear elementos
+    var container = document.createElement("div");
+    var autoWrapper = document.createElement("div");
+    var card = document.createElement("div");
+    var cardBody = document.createElement("div");
+    
+    // Header del form
+    var header = document.createElement("div");
+    var logo = document.createElement("img");
+    var title = document.createElement("p");
+    var titleText = document.createTextNode("Iniciar sesion");
+    
+    // Campos
+    var usernameWrapper = document.createElement("div");
+    var usernameInput = document.createElement("input");
+    
+    var passwordWrapper = document.createElement("div");
+    var passwordInput = document.createElement("input");
+    
+    // Checkbox
+    var checkboxWrapper = document.createElement("div");
+    var checkboxContainer = document.createElement("div");
+    var checkbox = document.createElement("input");
+    var checkboxLabel = document.createElement("label");
+    var checkboxText = document.createTextNode(" Aceptar terminos y condiciones");
+    
+    // Botón principal
+    var submitButton = document.createElement("button");
+    var submitText = document.createTextNode("Sign In");
+    
+    // Footer del card
+    var cardFooter = document.createElement("div");
+    var footerP = document.createElement("p");
+    var warningSpan = document.createElement("span");
+    var warningText = document.createTextNode("Do not have an account? ");
+    var registerLink = document.createElement("a");
+    var registerText = document.createTextNode(" Sign Up here");
+
+    // 2. Asignar clases
+    container.classList.add("w3-padding-32");
+    autoWrapper.classList.add("w3-auto");
+    card.classList.add("w3-white", "w3-round", "w3-margin-bottom", "w3-border");
+    cardBody.classList.add("w3-padding-large");
+    
+    header.classList.add("w3-center", "w3-padding-16");
+    logo.classList.add("w3-image");
+    
+    usernameWrapper.classList.add("w3-margin-bottom");
+    usernameInput.classList.add("w3-input", "w3-round", "w3-border");
+    
+    passwordWrapper.classList.add("w3-margin-bottom");
+    passwordInput.classList.add("w3-input", "w3-round", "w3-border");
+    
+    checkboxWrapper.classList.add("w3-margin-bottom");
+    checkboxContainer.classList.add("icheck-material-white");
+    checkbox.classList.add("w3-check");
+    
+    submitButton.classList.add("w3-button", "w3-round", "w3-margin-bottom", "w3-primary", "w3-block");
+    
+    cardFooter.classList.add("w3-center", "w3-border-top");
+    footerP.classList.add("w3-margin");
+    warningSpan.classList.add("w3-text-warning");
+
+    // 3. Asignar estilos
+    autoWrapper.style.width = "380px";
+
+    // 4. Asignar atributos
+    logo.src = "./assets/admin-logo.png";
+    logo.alt = "w3mix";
+    
+    usernameInput.type = "text";
+    usernameInput.placeholder = "Enter Username";
+    
+    passwordInput.type = "password";
+    passwordInput.placeholder = "Enter Password";
+    
+    checkbox.type = "checkbox";
+    checkbox.id = "user-checkbox-login";
+    checkbox.checked = true;
+    checkboxLabel.htmlFor = "user-checkbox-login";
+    
+    submitButton.type = "button";
+
+    registerLink.href = "WCRegisterFormView.html";
+ 
+    // Header
+    header.appendChild(logo);
+    header.appendChild(title);
+    title.appendChild(titleText);
+    
+    // Username
+    usernameWrapper.appendChild(usernameInput);
+    
+    // Password
+    passwordWrapper.appendChild(passwordInput);
+    
+    // Checkbox
+    checkboxLabel.appendChild(checkboxText);
+    checkboxContainer.appendChild(checkbox);
+    checkboxContainer.appendChild(checkboxLabel);
+    checkboxWrapper.appendChild(checkboxContainer);
+    
+    // Submit button
+    submitButton.appendChild(submitText);
+    
+    // Card body
+    cardBody.appendChild(header);
+    cardBody.appendChild(usernameWrapper);
+    cardBody.appendChild(passwordWrapper);
+    cardBody.appendChild(checkboxWrapper);
+    cardBody.appendChild(submitButton);
+    
+    // Card footer
+    warningSpan.appendChild(warningText);
+    registerLink.appendChild(registerText);
+    footerP.appendChild(warningSpan);
+    footerP.appendChild(registerLink);
+    cardFooter.appendChild(footerP);
+    
+    // Card completo
+    card.appendChild(cardBody);
+    card.appendChild(cardFooter);
+    
+    // Contenedores externos
+    autoWrapper.appendChild(card);
+    container.appendChild(autoWrapper);
+
+    return container;
+}
+
+class WCLoginFormView extends HTMLElement {
+    constructor() {
+        super();
+        this.loginForm = createLoginForm();
+        this._boundSubmitHandler = null;
+        this._submitButton = null;
+
+        this.appendChild(this.loginForm);
+    }
+
+    connectedCallback() {
+        this._submitButton = this.querySelector("button.w3-primary");
+        if (this._submitButton) {
+            this._boundSubmitHandler = this.handleLoginSubmit.bind(this);
+            this._submitButton.addEventListener("click", this._boundSubmitHandler);
+        }
+    }
+
+    disconnectedCallback() {
+        if (this._submitButton && this._boundSubmitHandler) {
+            this._submitButton.removeEventListener("click", this._boundSubmitHandler);
+            this._boundSubmitHandler = null;
+        }
+    }
+
+    handleLoginSubmit(event) {
+        console.log("Login form submitted");
+    }
+}
+
+customElements.define("wc-login-form-view", WCLoginFormView);
+</script>
+</html>
