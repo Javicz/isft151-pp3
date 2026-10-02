@@ -1,65 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Test Register</title>
-    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="../css/style.css">
-</head>
-<body class="w3-light-grey">
-    <wc-register-form-view></wc-register-form-view>
-</body>
 <script>
-function createIcon(classes) {
-    var icon = document.createElement("i");
-    if (classes && classes.length > 0) {
-        icon.classList.add.apply(icon.classList, classes);
-    }
-    return icon;
-}
-
 function createRegisterForm() {
-    //Crear elementos
     var container = document.createElement("div");
     var autoWrapper = document.createElement("div");
     var card = document.createElement("div");
     var cardBody = document.createElement("div");
-    
-    // Header del form
+
     var header = document.createElement("div");
     var logo = document.createElement("img");
     var title = document.createElement("p");
     var titleText = document.createTextNode("Registrarse");
-    
-    // Campos
+
     var usernameWrapper = document.createElement("div");
     var usernameInput = document.createElement("input");
-    
+
     var emailWrapper = document.createElement("div");
     var emailInput = document.createElement("input");
-    
+
     var passwordWrapper = document.createElement("div");
     var passwordInput = document.createElement("input");
-    
-    // Checkbox y link
+
     var optionsRow = document.createElement("div");
     var checkboxCol = document.createElement("div");
     var checkboxContainer = document.createElement("div");
     var checkbox = document.createElement("input");
     var checkboxLabel = document.createElement("label");
     var checkboxText = document.createTextNode("Recuerdame");
-    
+
     var linkCol = document.createElement("div");
     var resetLink = document.createElement("a");
     var resetText = document.createTextNode("");
-    
-    // Botón principal
+
     var submitButton = document.createElement("button");
     var submitText = document.createTextNode("Registrarse");
-    
-    // Footer del card
+
     var cardFooter = document.createElement("div");
     var footerP = document.createElement("p");
     var warningSpan = document.createElement("span");
@@ -67,33 +40,32 @@ function createRegisterForm() {
     var loginLink = document.createElement("a");
     var loginText = document.createTextNode(" iniciar sesion aqui");
 
-    //Asignar clases
     container.classList.add("w3-padding-32");
     autoWrapper.classList.add("w3-auto");
     card.classList.add("w3-white", "w3-round", "w3-margin-bottom", "w3-border");
     cardBody.classList.add("w3-padding-large");
-    
+
     header.classList.add("w3-center", "w3-padding-16");
     logo.classList.add("w3-image");
-    
+
     usernameWrapper.classList.add("w3-margin-bottom");
     usernameInput.classList.add("w3-input", "w3-round", "w3-border");
-    
+
     emailWrapper.classList.add("w3-margin-bottom");
     emailInput.classList.add("w3-input", "w3-round", "w3-border");
-    
+
     passwordWrapper.classList.add("w3-margin-bottom");
     passwordInput.classList.add("w3-input", "w3-round", "w3-border");
-    
+
     optionsRow.classList.add("w3-row", "w3-margin-bottom");
     checkboxCol.classList.add("w3-col", "m6");
     checkboxContainer.classList.add("icheck-material-white");
     checkbox.classList.add("w3-check");
-    
+
     linkCol.classList.add("w3-col", "m6", "w3-right-align");
-    
+
     submitButton.classList.add("w3-button", "w3-round", "w3-margin-bottom", "w3-primary", "w3-block");
-    
+
     cardFooter.classList.add("w3-center", "w3-border-top");
     footerP.classList.add("w3-margin");
     warningSpan.classList.add("w3-text-warning");
@@ -102,67 +74,70 @@ function createRegisterForm() {
 
     logo.src = "./assets/admin-logo.png";
     logo.alt = "w3mix";
-    
+
     usernameInput.type = "text";
     usernameInput.placeholder = "Ingresa tu nombre";
-    
-    emailInput.type = "text";
+    usernameInput.id = "register-nombre";
+    usernameInput.name = "nombre";
+
+    emailInput.type = "email";
     emailInput.placeholder = "Ingresa tu email";
-    
-    passwordInput.type = "contraseña";
+    emailInput.id = "register-email";
+    emailInput.name = "email";
+
+    passwordInput.type = "password";
     passwordInput.placeholder = "Repite tu contraseña";
-    
+    passwordInput.id = "register-password";
+    passwordInput.name = "contrasena";
+
     checkbox.type = "checkbox";
     checkbox.id = "user-checkbox-register";
     checkbox.checked = true;
     checkboxLabel.htmlFor = "user-checkbox-register";
-    
+
     resetLink.href = "reset-password.html";
-    
+
     submitButton.type = "button";
-    
+    submitButton.id = "register-submit";
+
     loginLink.href = "WCLoginFormView.html";
 
     header.appendChild(logo);
     header.appendChild(title);
     title.appendChild(titleText);
-    
+
     usernameWrapper.appendChild(usernameInput);
-    
     emailWrapper.appendChild(emailInput);
-    
     passwordWrapper.appendChild(passwordInput);
-    
+
     checkboxLabel.appendChild(checkboxText);
     checkboxContainer.appendChild(checkbox);
     checkboxContainer.appendChild(checkboxLabel);
     checkboxCol.appendChild(checkboxContainer);
-    
+
     resetLink.appendChild(resetText);
     linkCol.appendChild(resetLink);
-    
+
     optionsRow.appendChild(checkboxCol);
     optionsRow.appendChild(linkCol);
-    
+
     submitButton.appendChild(submitText);
-    
-    
+
     cardBody.appendChild(header);
     cardBody.appendChild(usernameWrapper);
     cardBody.appendChild(emailWrapper);
     cardBody.appendChild(passwordWrapper);
     cardBody.appendChild(optionsRow);
     cardBody.appendChild(submitButton);
-    
+
     warningSpan.appendChild(warningText);
     loginLink.appendChild(loginText);
     footerP.appendChild(warningSpan);
     footerP.appendChild(loginLink);
     cardFooter.appendChild(footerP);
-    
+
     card.appendChild(cardBody);
     card.appendChild(cardFooter);
-    
 
     autoWrapper.appendChild(card);
     container.appendChild(autoWrapper);
@@ -174,33 +149,100 @@ class WCRegisterFormView extends HTMLElement {
     constructor() {
         super();
         this.registerForm = createRegisterForm();
-        this._boundSubmitHandler = null;
-        this._submitButton = null;
-
+        this.boundSubmitHandler = null;
+        this.submitButton = null;
         this.appendChild(this.registerForm);
     }
 
     connectedCallback() {
-        this._submitButton = this.querySelector("button.w3-primary");
-        if (this._submitButton) {
-            this._boundSubmitHandler = this.handleRegisterSubmit.bind(this);
-            this._submitButton.addEventListener("click", this._boundSubmitHandler);
+        this.submitButton = this.querySelector("#register-submit");
+        if (this.submitButton) {
+            this.boundSubmitHandler = this.handleRegisterSubmit.bind(this);
+            this.submitButton.addEventListener("click", this.boundSubmitHandler);
         }
     }
 
     disconnectedCallback() {
-        if (this._submitButton && this._boundSubmitHandler) {
-            this._submitButton.removeEventListener("click", this._boundSubmitHandler);
-            this._boundSubmitHandler = null;
+        if (this.submitButton && this.boundSubmitHandler) {
+            this.submitButton.removeEventListener("click", this.boundSubmitHandler);
+            this.boundSubmitHandler = null;
         }
     }
 
-    // Manejador semántico
-    handleRegisterSubmit(event) {
-        console.log("Register form submitted");
+    async handleRegisterSubmit() {
+        const nombreInput = this.querySelector("#register-nombre");
+        const emailInput = this.querySelector("#register-email");
+        const contrasenaInput = this.querySelector("#register-password");
+
+        if (!nombreInput || !emailInput || !contrasenaInput) {
+            alert("Error interno: no se encontraron los campos del formulario");
+            return;
+        }
+
+        const nombre = nombreInput.value.trim();
+        const email = emailInput.value.trim();
+        const contrasena = contrasenaInput.value;
+
+        if (!nombre || !email || !contrasena) {
+            alert("Por favor, completá todos los campos");
+            return;
+        }
+
+        if (!email.includes("@")) {
+            alert("El email no es válido");
+            return;
+        }
+
+        if (contrasena.length < 6) {
+            alert("La contraseña debe tener al menos 6 caracteres");
+            return;
+        }
+
+        if (this.submitButton) {
+            this.submitButton.disabled = true;
+            this.submitButton.textContent = "Registrando...";
+        }
+
+        try {
+            const respuesta = await fetch("/api/auth/registrar", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                credentials: "include",
+                body: JSON.stringify({
+                    nombre: nombre,
+                    email: email,
+                    contrasena: contrasena
+                })
+            });
+
+            let datos = null;
+            try {
+                datos = await respuesta.json();
+            } catch (e) {
+                datos = null;
+            }
+
+            if (respuesta.ok) {
+                alert("¡Registro exitoso! Ahora podés iniciar sesión");
+                window.location.href = "WCLoginFormView.html";
+            } else {
+                const mensaje = datos && datos.mensaje ? datos.mensaje : "No se pudo registrar";
+                alert("Error: " + mensaje);
+            }
+
+        } catch (error) {
+            console.error("Error de conexión:", error);
+            alert("Error de conexión con el servidor");
+        } finally {
+            if (this.submitButton) {
+                this.submitButton.disabled = false;
+                this.submitButton.textContent = "Registrarse";
+            }
+        }
     }
 }
 
 customElements.define("wc-register-form-view", WCRegisterFormView);
 </script>
-</html>
