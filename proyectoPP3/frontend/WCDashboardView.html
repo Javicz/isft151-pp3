@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>W3.CSS - MVC WebComponent Application View</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+  <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-theme-teal.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  
+  <style>
+    body { font-family: "Roboto", sans-serif; margin: 0; }
+    .w3-bar-block .w3-bar-item {
+      padding: 16px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    class WCDashboardView extends HTMLElement {
+      
+      // ---------- CONSTRUCTOR ----------
+      constructor() {
+        super();
+
+        // 1. Crear los elementos del DOM
+        this.sidebar = document.createElement('nav');
+        this.overlay = document.createElement('div');
+        this.mainContainer = document.createElement('div');
+        this.topBar = document.createElement('div');
+        this.bodyContent = document.createElement('div');
+        this.footer = document.createElement('footer');
+
+        // 2. Construir la estructura métodos auxiliares
+        this._buildSidebar();
+        this._buildOverlay();
+        this._buildMainLayout();
+
+        // 3. Agregar los elementos al componente 
+        this.appendChild(this.sidebar);
+        this.appendChild(this.overlay);
+        this.appendChild(this.mainContainer);
+
+        // 4. Vincular los métodos 
+        this._handleSidebarOpen = this._handleSidebarOpen.bind(this);
+        this._handleSidebarClose = this._handleSidebarClose.bind(this);
+        this._handleAccordionToggle = this._handleAccordionToggle.bind(this);
+        this._handleWindowScroll = this._handleWindowScroll.bind(this);
+      }
+
+      // ---------- CONNECTED CALLBACK ----------
+      connectedCallback() {
+        this._getElement('#btnSidebarOpen').addEventListener('click', this._handleSidebarOpen);
+        this._getElement('#btnSidebarClose').addEventListener('click', this._handleSidebarClose);
+        this.overlay.addEventListener('click', this._handleSidebarClose);
+        this._getElement('#btnAccordionToggle').addEventListener('click', this._handleAccordionToggle);
+        window.addEventListener('scroll', this._handleWindowScroll);
+      }
+
+      // ---------- DISCONNECTED CALLBACK ----------
+      disconnectedCallback() {
+        this._getElement('#btnSidebarOpen').removeEventListener('click', this._handleSidebarOpen);
+        this._getElement('#btnSidebarClose').removeEventListener('click', this._handleSidebarClose);
+        this.overlay.removeEventListener('click', this._handleSidebarClose);
+        this._getElement('#btnAccordionToggle').removeEventListener('click', this._handleAccordionToggle);
+        window.removeEventListener('scroll', this._handleWindowScroll);
+      }
+
+      // ---------- MÉTODOS AUXILIARES DE CONSTRUCCIÓN ----------
+      _buildSidebar() {
+        this.sidebar.className = "w3-sidebar w3-bar-block w3-collapse w3-animate-left w3-card";
+        this.sidebar.style.zIndex = "3";
+        this.sidebar.style.width = "250px";
+        this.sidebar.id = "mySidebar";
+
+        // Logo / Brand
+        const brandLink = document.createElement('a');
+        brandLink.className = "w3-bar-item w3-button w3-border-bottom w3-large";
+        brandLink.href = "#";
+        const brandImg = document.createElement('img');
+        brandImg.src = "https://www.w3schools.com/images/w3schools.png";
+        brandImg.style.width = "80%";
+        brandLink.appendChild(brandImg);
+        this.sidebar.appendChild(brandLink);
+
+        // Botón cerrar 
+        const closeLink = document.createElement('a');
+        closeLink.className = "w3-bar-item w3-button w3-hide-large w3-large";
+        closeLink.href = "javascript:void(0)";
+        closeLink.id = "btnSidebarClose";
+        closeLink.textContent = "Close ";
+        const closeIcon = document.createElement('i');
+        closeIcon.className = "fa fa-remove";
+        closeLink.appendChild(closeIcon);
+        this.sidebar.appendChild(closeLink);
+
+        // Elementos del menú
+        const menuItems = [
+          { name: 'Home', style: 'w3-teal' },
+          { name: 'Link 1', style: '' },
+          { name: 'Link 2', style: '' },
+          { name: 'Link 3', style: '' },
+          { name: 'Link 4', style: '' },
+          { name: 'Link 5', style: '' }
+        ];
+
+        for (let i = 0; i < menuItems.length; i++) {
+          const item = menuItems[i];
+          const a = document.createElement('a');
+          a.className = ("w3-bar-item w3-button " + item.style).trim();
+          a.href = "#";
+          a.textContent = item.name;
+          this.sidebar.appendChild(a);
+        }
+
+        // Dropdown (accordion)
+        const accordionWrapper = document.createElement('div');
+        const accordionToggle = document.createElement('a');
+        accordionToggle.className = "w3-bar-item w3-button";
+        accordionToggle.href = "javascript:void(0)";
+        accordionToggle.id = "btnAccordionToggle";
+        accordionToggle.textContent = "Dropdown ";
+        const caretIcon = document.createElement('i');
+        caretIcon.className = "fa fa-caret-down";
+        accordionToggle.appendChild(caretIcon);
+        accordionWrapper.appendChild(accordionToggle);
+
+        const accordionContent = document.createElement('div');
+        accordionContent.id = "appAccordionMenu";
+        accordionContent.className = "w3-hide";
+
+        for (let i = 0; i < 3; i++) {
+          const subLink = document.createElement('a');
+          subLink.className = "w3-bar-item w3-button";
+          subLink.href = "#";
+          subLink.textContent = "Link " + (i + 1);
+          accordionContent.appendChild(subLink);
+        }
+
+        accordionWrapper.appendChild(accordionContent);
+        this.sidebar.appendChild(accordionWrapper);
+      }
+
+      _buildOverlay() {
+        this.overlay.className = "w3-overlay w3-hide-large w3-animate-opacity";
+        this.overlay.style.cursor = "pointer";
+        this.overlay.id = "myOverlay";
+      }
+
+      _buildMainLayout() {
+        this.mainContainer.className = "w3-main";
+        this.mainContainer.style.marginLeft = "250px";
+
+        // ---- Top Bar ----
+        this.topBar.className = "w3-container w3-top w3-theme w3-large";
+        this.topBar.id = "myTop";
+        this.topBar.style.display = "flex";
+        this.topBar.style.justifyContent = "space-between";
+        this.topBar.style.alignItems = "center";
+        this.topBar.style.height = "55px";
+
+        // Hamburguesa (solo móvil)
+        const hamburgerContainer = document.createElement('p');
+        hamburgerContainer.style.margin = "0";
+        const hamburgerIcon = document.createElement('i');
+        hamburgerIcon.className = "fa fa-bars w3-button w3-teal w3-hide-large w3-xlarge";
+        hamburgerIcon.id = "btnSidebarOpen";
+        hamburgerContainer.appendChild(hamburgerIcon);
+        this.topBar.appendChild(hamburgerContainer);
+
+        // Botones a la derecha 
+        const rightGroup = document.createElement('div');
+        rightGroup.className = "w3-right";
+
+        const btnA = document.createElement('button');
+        btnA.className = "w3-button w3-theme w3-hover-opacity";
+        btnA.textContent = "Acción A";
+
+        const btnB = document.createElement('button');
+        btnB.className = "w3-button w3-theme w3-hover-opacity";
+        btnB.textContent = "Acción B";
+
+        rightGroup.appendChild(btnA);
+        rightGroup.appendChild(btnB);
+        this.topBar.appendChild(rightGroup);
+
+        this.mainContainer.appendChild(this.topBar);
+
+        // Espaciador por el top bar fijo
+        const topSpacer = document.createElement('div');
+        topSpacer.style.height = "55px";
+        this.mainContainer.appendChild(topSpacer);
+
+        // ---- Cuerpo derecho vacío ----
+        this.bodyContent.className = "w3-container";
+        this.bodyContent.style.padding = "32px";
+        this.bodyContent.style.minHeight = "calc(100vh - 170px)";
+        // Dejamos el cuerpo vacío sin contenido
+        this.mainContainer.appendChild(this.bodyContent);
+
+        // ---- Footer ----
+        this.footer.className = "w3-container w3-theme";
+        this.footer.style.padding = "32px";
+        const footerParagraph = document.createElement('p');
+        footerParagraph.textContent = "Footer de la aplicación genérica © 2026";
+        this.footer.appendChild(footerParagraph);
+        this.mainContainer.appendChild(this.footer);
+      }
+
+      // ---------- MÉTODOS MANEJADORES  ----------
+      _handleSidebarOpen() {
+        this.sidebar.style.display = "block";
+        this.overlay.style.display = "block";
+      }
+
+      _handleSidebarClose() {
+        this.sidebar.style.display = "none";
+        this.overlay.style.display = "none";
+      }
+
+      _handleAccordionToggle() {
+        const toggle = this._getElement('#btnAccordionToggle');
+        const content = this._getElement('#appAccordionMenu');
+
+        if (content.classList.contains('w3-show')) {
+          content.classList.remove('w3-show');
+          toggle.classList.remove('w3-theme');
+        } else {
+          content.classList.add('w3-show');
+          toggle.classList.add('w3-theme');
+        }
+      }
+
+      _handleWindowScroll() {
+        if (document.body.scrollTop > 50 || document.documentElement.scrollTop > 50) {
+          this.topBar.classList.add("w3-card-4", "w3-animate-opacity");
+        } else {
+          this.topBar.classList.remove("w3-card-4", "w3-animate-opacity");
+        }
+      }
+
+      // ---------- MÉTODO AUXILIAR  ----------
+      _getElement(selector) {
+        return this.querySelector(selector);
+      }
+    }
+
+    // ============================================================
+    // REGISTRO DEL WEB COMPONENT
+    // ============================================================
+    customElements.define('wc-dashboard-view', WCDashboardView);
+
+    // ============================================================
+    // INSTANCIACIÓN
+    // ============================================================
+    function main() {
+      const view = new WCDashboardView();
+      document.body.appendChild(view);
+    }
+
+    window.onload = main;
+  </script>
+</body>
+</html>

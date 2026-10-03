@@ -1,12 +1,33 @@
 import { DatabaseSync } from 'node:sqlite';
+import bcrypt from 'bcryptjs';
 
 const db = new DatabaseSync('./db.sqlite3');
 
-console.log('🔧 Creando tablas...');
+// ============================================
+// BORRAR TABLAS EXISTENTES
+// ============================================
+console.log('🗑️  Borrando tablas existentes...');
+
+db.exec(`
+    DROP TABLE IF EXISTS reservation;
+    DROP TABLE IF EXISTS loan;
+    DROP TABLE IF EXISTS resource;
+    DROP TABLE IF EXISTS access;
+    DROP TABLE IF EXISTS endpoint;
+    DROP TABLE IF EXISTS members;
+    DROP TABLE IF EXISTS \`group\`;
+    DROP TABLE IF EXISTS user;
+    DROP TABLE IF EXISTS status;
+`);
+
+console.log('  ✅ Tablas borradas');
 
 // ============================================
-// TABLA: user
+// CREAR TABLAS
 // ============================================
+console.log('\n🔧 Creando tablas...');
+
+// TABLA: user
 db.exec(`
     CREATE TABLE IF NOT EXISTS user (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,9 +37,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla user creada');
 
-// ============================================
 // TABLA: group
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS \`group\` (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,9 +46,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla group creada');
 
-// ============================================
 // TABLA: members
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS members (
         id_user INTEGER NOT NULL,
@@ -41,9 +58,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla members creada');
 
-// ============================================
 // TABLA: endpoint
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS endpoint (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,9 +67,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla endpoint creada');
 
-// ============================================
 // TABLA: access
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS access (
         id_group INTEGER NOT NULL,
@@ -66,9 +79,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla access creada');
 
-// ============================================
 // TABLA: status
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS status (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,9 +91,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla status creada');
 
-// ============================================
 // TABLA: resource
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS resource (
         id TEXT PRIMARY KEY,
@@ -99,9 +108,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla resource creada');
 
-// ============================================
 // TABLA: loan
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS loan (
         id TEXT PRIMARY KEY,
@@ -123,9 +130,7 @@ db.exec(`
 `);
 console.log('  ✅ Tabla loan creada');
 
-// ============================================
 // TABLA: reservation
-// ============================================
 db.exec(`
     CREATE TABLE IF NOT EXISTS reservation (
         id TEXT PRIMARY KEY,
@@ -144,12 +149,13 @@ db.exec(`
 console.log('  ✅ Tabla reservation creada');
 
 // ============================================
-// DATOS INICIALES
+// INSERTAR DATOS INICIALES
 // ============================================
 console.log('\n📝 Insertando datos iniciales...');
 
+// Estados
 db.exec(`
-    INSERT OR IGNORE INTO status (name, type, color, description) VALUES
+    INSERT INTO status (name, type, color, description) VALUES
     ('Disponible', 'gestion', '#28a745', 'Recurso disponible'),
     ('Prestado', 'gestion', '#ffc107', 'Recurso prestado'),
     ('Mantenimiento', 'gestion', '#fd7e14', 'Recurso en reparación'),
@@ -162,12 +168,120 @@ db.exec(`
     ('Dañado', 'conservacion', '#fd7e14', 'Daños significativos'),
     ('Fuera de servicio', 'conservacion', '#dc3545', 'No operable');
 `);
-console.log('  ✅ Estados insertados');
+console.log('  ✅ Estados insertados (11)');
 
+// Grupos
 db.exec(`
-    INSERT OR IGNORE INTO \`group\` (name) VALUES
+    INSERT INTO \`group\` (name) VALUES
     ('admin'), ('profesor'), ('tecnico'), ('preceptor');
 `);
-console.log('  ✅ Grupos insertados');
+console.log('  ✅ Grupos insertados (4)');
 
-console.log('\n✅ Base de datos configurada correctamente.');
+// ============================================
+// CREAR USUARIO ADMIN
+// ============================================
+console.log('\n👤 Creando usuario admin...');
+
+const adminPassword = bcrypt.hashSync('admin', 10);
+
+const result = db.prepare(
+    'INSERT INTO user (username, password) VALUES (?, ?)'
+).run('admin', adminPassword);
+
+console.log('  ✅ Usuario admin creado (id: ' + result.lastInsertRowid + ')');
+
+// Asignar admin al grupo admin
+const adminUser = db.prepare('SELECT id FROM user WHERE username = ?').get('admin');
+const adminGroup = db.prepare("SELECT id FROM `group` WHERE name = 'admin'").get();
+
+db.prepare(
+    'INSERT INTO members (id_user, id_group) VALUES (?, ?)'
+).run(adminUser.id, adminGroup.id);
+
+console.log('  ✅ Admin asignado al grupo admin');
+
+// ============================================
+// REGISTRAR ENDPOINTS
+// ============================================
+console.log('\n🔗 Registrando endpoints...');
+
+const endpoints = [
+    '/login',
+    '/register',
+    '/api/resources/list',
+    '/api/resources/get',
+    '/api/resources/create',
+    '/api/resources/update',
+    '/api/resources/remove',
+    '/api/resources/search',
+    '/api/resources/qr',
+    '/api/status/list',
+    '/api/status/get',
+    '/api/status/create',
+    '/api/status/remove',
+    '/api/status/change',
+    '/api/loans/list',
+    '/api/loans/get',
+    '/api/loans/create',
+    '/api/loans/remove',
+    '/api/loans/return',
+    '/api/loans/overdue',
+    '/api/reservations/list',
+    '/api/reservations/get',
+    '/api/reservations/create',
+    '/api/reservations/cancel',
+    '/api/availability/current',
+    '/api/availability/count',
+    '/api/availability/summary',
+    '/api/calendar/reservations',
+    '/api/calendar/business-days',
+    '/api/calendar/validate-date',
+    '/api/calendar/validate-schedule'
+];
+
+const insertEndpoint = db.prepare('INSERT OR IGNORE INTO endpoint (path) VALUES (?)');
+
+endpoints.forEach(path => {
+    insertEndpoint.run(path);
+});
+
+console.log(`  ✅ ${endpoints.length} endpoints registrados`);
+
+// ============================================
+// ASIGNAR PERMISOS AL GRUPO ADMIN
+// ============================================
+console.log('\n🔑 Asignando permisos al grupo admin...');
+
+const insertAccess = db.prepare('INSERT OR IGNORE INTO access (id_group, id_endpoint) VALUES (?, ?)');
+const getEndpoint = db.prepare('SELECT id FROM endpoint WHERE path = ?');
+
+endpoints.forEach(path => {
+    const endpoint = getEndpoint.get(path);
+    if (endpoint) {
+        insertAccess.run(adminGroup.id, endpoint.id);
+    }
+});
+
+console.log(`  ✅ ${endpoints.length} permisos asignados al grupo admin`);
+
+// ============================================
+// RESUMEN FINAL
+// ============================================
+console.log('\n' + '='.repeat(50));
+console.log('✅ BASE DE DATOS INICIALIZADA CORRECTAMENTE');
+console.log('='.repeat(50));
+console.log('');
+console.log('📌 Usuario admin:');
+console.log('   Usuario: admin');
+console.log('   Contraseña: admin');
+console.log('');
+console.log('📌 Datos creados:');
+console.log(`   - 1 usuario (admin)`);
+console.log(`   - 4 grupos (admin, profesor, tecnico, preceptor)`);
+console.log(`   - 11 estados (6 gestion + 5 conservacion)`);
+console.log(`   - ${endpoints.length} endpoints`);
+console.log(`   - ${endpoints.length} permisos`);
+console.log('');
+console.log('🚀 Podés iniciar el backend con:');
+console.log('   node backend/server/main.mjs');
+console.log('');

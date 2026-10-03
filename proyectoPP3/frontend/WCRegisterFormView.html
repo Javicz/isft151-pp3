@@ -1,15 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Test Register</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="w3-light-grey">
+    <wc-register-form-view></wc-register-form-view>
+</body>
 <script>
+function createIcon(classes) {
+    var icon = document.createElement("i");
+    if (classes && classes.length > 0) {
+        icon.classList.add.apply(icon.classList, classes);
+    }
+    return icon;
+}
+
 function createRegisterForm() {
+    //Crear elementos
     var container = document.createElement("div");
     var autoWrapper = document.createElement("div");
     var card = document.createElement("div");
     var cardBody = document.createElement("div");
 
+    // Header del form
     var header = document.createElement("div");
     var logo = document.createElement("img");
     var title = document.createElement("p");
     var titleText = document.createTextNode("Registrarse");
 
+    // Campos
     var usernameWrapper = document.createElement("div");
     var usernameInput = document.createElement("input");
 
@@ -19,6 +43,7 @@ function createRegisterForm() {
     var passwordWrapper = document.createElement("div");
     var passwordInput = document.createElement("input");
 
+    // Checkbox y link
     var optionsRow = document.createElement("div");
     var checkboxCol = document.createElement("div");
     var checkboxContainer = document.createElement("div");
@@ -30,9 +55,11 @@ function createRegisterForm() {
     var resetLink = document.createElement("a");
     var resetText = document.createTextNode("");
 
+    // Botón principal
     var submitButton = document.createElement("button");
     var submitText = document.createTextNode("Registrarse");
 
+    // Footer del card
     var cardFooter = document.createElement("div");
     var footerP = document.createElement("p");
     var warningSpan = document.createElement("span");
@@ -40,6 +67,7 @@ function createRegisterForm() {
     var loginLink = document.createElement("a");
     var loginText = document.createTextNode(" iniciar sesion aqui");
 
+    //Asignar clases
     container.classList.add("w3-padding-32");
     autoWrapper.classList.add("w3-auto");
     card.classList.add("w3-white", "w3-round", "w3-margin-bottom", "w3-border");
@@ -77,18 +105,13 @@ function createRegisterForm() {
 
     usernameInput.type = "text";
     usernameInput.placeholder = "Ingresa tu nombre";
-    usernameInput.id = "register-nombre";
-    usernameInput.name = "nombre";
 
-    emailInput.type = "email";
+    emailInput.type = "text";
     emailInput.placeholder = "Ingresa tu email";
-    emailInput.id = "register-email";
-    emailInput.name = "email";
 
-    passwordInput.type = "password";
+    // ⚠️ NO SE MODIFICA — queda tal cual el original
+    passwordInput.type = "contraseña";
     passwordInput.placeholder = "Repite tu contraseña";
-    passwordInput.id = "register-password";
-    passwordInput.name = "contrasena";
 
     checkbox.type = "checkbox";
     checkbox.id = "user-checkbox-register";
@@ -98,7 +121,6 @@ function createRegisterForm() {
     resetLink.href = "reset-password.html";
 
     submitButton.type = "button";
-    submitButton.id = "register-submit";
 
     loginLink.href = "WCLoginFormView.html";
 
@@ -107,7 +129,9 @@ function createRegisterForm() {
     title.appendChild(titleText);
 
     usernameWrapper.appendChild(usernameInput);
+
     emailWrapper.appendChild(emailInput);
+
     passwordWrapper.appendChild(passwordInput);
 
     checkboxLabel.appendChild(checkboxText);
@@ -122,6 +146,7 @@ function createRegisterForm() {
     optionsRow.appendChild(linkCol);
 
     submitButton.appendChild(submitText);
+
 
     cardBody.appendChild(header);
     cardBody.appendChild(usernameWrapper);
@@ -139,6 +164,7 @@ function createRegisterForm() {
     card.appendChild(cardBody);
     card.appendChild(cardFooter);
 
+
     autoWrapper.appendChild(card);
     container.appendChild(autoWrapper);
 
@@ -149,100 +175,65 @@ class WCRegisterFormView extends HTMLElement {
     constructor() {
         super();
         this.registerForm = createRegisterForm();
-        this.boundSubmitHandler = null;
-        this.submitButton = null;
+        this._boundSubmitHandler = null;
+        this._submitButton = null;
+
         this.appendChild(this.registerForm);
     }
 
     connectedCallback() {
-        this.submitButton = this.querySelector("#register-submit");
-        if (this.submitButton) {
-            this.boundSubmitHandler = this.handleRegisterSubmit.bind(this);
-            this.submitButton.addEventListener("click", this.boundSubmitHandler);
+        this._submitButton = this.querySelector("button.w3-primary");
+        if (this._submitButton) {
+            this._boundSubmitHandler = this.handleRegisterSubmit.bind(this);
+            this._submitButton.addEventListener("click", this._boundSubmitHandler);
         }
     }
 
     disconnectedCallback() {
-        if (this.submitButton && this.boundSubmitHandler) {
-            this.submitButton.removeEventListener("click", this.boundSubmitHandler);
-            this.boundSubmitHandler = null;
+        if (this._submitButton && this._boundSubmitHandler) {
+            this._submitButton.removeEventListener("click", this._boundSubmitHandler);
+            this._boundSubmitHandler = null;
         }
     }
 
-    async handleRegisterSubmit() {
-        const nombreInput = this.querySelector("#register-nombre");
-        const emailInput = this.querySelector("#register-email");
-        const contrasenaInput = this.querySelector("#register-password");
+    // Manejador semántico
+    async handleRegisterSubmit(event) {
+        // Leer todos los inputs y filtrar los que no son checkbox
+        const allInputs = this.querySelectorAll("input");
+        const textInputs = Array.from(allInputs).filter(input => input.type !== "checkbox");
 
-        if (!nombreInput || !emailInput || !contrasenaInput) {
-            alert("Error interno: no se encontraron los campos del formulario");
+        const username = textInputs[0] ? textInputs[0].value : "";
+        const email = textInputs[1] ? textInputs[1].value : "";
+        const password = textInputs[2] ? textInputs[2].value : "";
+
+        if (!username || !password) {
+            alert("Ingresá usuario y contraseña");
             return;
-        }
-
-        const nombre = nombreInput.value.trim();
-        const email = emailInput.value.trim();
-        const contrasena = contrasenaInput.value;
-
-        if (!nombre || !email || !contrasena) {
-            alert("Por favor, completá todos los campos");
-            return;
-        }
-
-        if (!email.includes("@")) {
-            alert("El email no es válido");
-            return;
-        }
-
-        if (contrasena.length < 6) {
-            alert("La contraseña debe tener al menos 6 caracteres");
-            return;
-        }
-
-        if (this.submitButton) {
-            this.submitButton.disabled = true;
-            this.submitButton.textContent = "Registrando...";
         }
 
         try {
-            const respuesta = await fetch("/api/auth/registrar", {
+            const response = await fetch("http://127.0.0.1:3000/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                credentials: "include",
-                body: JSON.stringify({
-                    nombre: nombre,
-                    email: email,
-                    contrasena: contrasena
-                })
+                body: JSON.stringify({ username, password })
             });
 
-            let datos = null;
-            try {
-                datos = await respuesta.json();
-            } catch (e) {
-                datos = null;
-            }
+            const data = await response.json();
 
-            if (respuesta.ok) {
-                alert("¡Registro exitoso! Ahora podés iniciar sesión");
+            if (response.ok && data.status === "ok") {
+                alert("Usuario registrado correctamente");
                 window.location.href = "WCLoginFormView.html";
             } else {
-                const mensaje = datos && datos.mensaje ? datos.mensaje : "No se pudo registrar";
-                alert("Error: " + mensaje);
+                alert("Error al registrar: " + (data.message || "Error desconocido"));
             }
-
         } catch (error) {
-            console.error("Error de conexión:", error);
-            alert("Error de conexión con el servidor");
-        } finally {
-            if (this.submitButton) {
-                this.submitButton.disabled = false;
-                this.submitButton.textContent = "Registrarse";
-            }
+            alert("Error: " + error.message);
         }
     }
 }
 
 customElements.define("wc-register-form-view", WCRegisterFormView);
 </script>
+</html>
