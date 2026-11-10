@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gestión de Recursos Escolares</title>
+    <link rel="icon" type="image/png" href="image/logo.png">
+    <link rel="apple-touch-icon" href="image/logo.png">
+    <link rel="stylesheet" href="css/w3.css">
+    <link rel="stylesheet" href="css/w3-theme-teal.css">
+    <style>
+        body {
+            font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="w3-light-grey">
+    <wc-navbar></wc-navbar>
+    <wc-login-view style="display: none;"></wc-login-view>
+    <wc-register-view style="display: none;"></wc-register-view>
+    <wc-dashboard-view></wc-dashboard-view>
+
+    <script type="module" src="js/view/WCLoginView.js"></script>
+    <script type="module" src="js/view/WCRegisterView.js"></script>
+    <script type="module" src="js/view/WCNavbarView.js"></script>
+    <script type="module" src="js/view/WCDashboardView.js"></script>
+    <script type="module" src="js/view/WCAvailabilityView.js"></script>
+    <script type="module" src="js/view/WCInventoryView.js"></script>
+    <script type="module" src="js/view/WCHelpView.js"></script>
+</body>
+</html>
