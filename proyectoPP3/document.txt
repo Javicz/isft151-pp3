@@ -1,0 +1,1356 @@
+================================================================================
+DOCUMENTO TÉCNICO DEL PROYECTO
+Sistema de Gestión de Recursos Escolares
+================================================================================
+
+1. DESCRIPCIÓN GENERAL
+--------------------------------------------------------------------------------
+El proyecto es una aplicación web separada en tres capas:
+
+- Backend: API HTTP en Node.js (módulos ESM) con persistencia en SQLite.
+- Frontend: aplicación Web Components con patrón MVC (Modelo, Vista, Controlador).
+- Testing: pruebas unitarias y de integración ejecutadas con node:test.
+
+El backend usa el módulo nativo node:sqlite y expone procedimientos por HTTP.
+El frontend consume esos procedimientos mediante POST y muestra una interfaz en
+español. Todo el código fuente (archivos, funciones y variables) está escrito en
+inglés; los textos visibles para el usuario permanecen en español.
+
+Estructura general:
+
+  backend/
+    configure/config.json
+    data/*.json
+    handlers/
+    repositories/
+    server/
+    usescause/
+  frontend/
+    css/
+    image/
+    js/
+      controller/
+      model/
+      view/
+      api.js
+      config.js
+      resources.js
+      session.js
+      shadow.js
+    index.html
+  release/
+    init-db.mjs
+    setup.ps1 / setup.sh
+    deploy.ps1 / deploy.sh
+    serve-frontend.mjs
+    README.md
+  testing/
+  db.sqlite3
+  document.txt
+  package.json
+
+
+2. BACKEND
+--------------------------------------------------------------------------------
+
+2.1 backend/server/database.js
+--------------------------------------------------------------------------------
+Archivo de conexión única a SQLite.
+
+- Importa DatabaseSync de node:sqlite.
+- Crea la instancia db apuntando a ./db.sqlite3.
+- Exporta db por defecto.
+
+Esta conexión es compartida por los repositorios que trabajan con SQL.
+
+
+2.2 backend/server/main.mjs
+--------------------------------------------------------------------------------
+Punto de entrada del servidor HTTP.
+
+Funciones:
+
+- defaultConfig()
+    Devuelve la configuración por defecto: IP 127.0.0.1, puerto 3000,
+    defaultPath del frontend y ruta de la base de datos.
+
+- loadConfig()
+    Lee backend/configure/config.json. Si falla, registra el error y usa
+    defaultConfig().
+
+- connectDb(path)
+    Resuelve la ruta de la base de datos y devuelve una instancia DatabaseSync.
+
+- requestDispatcher(req, res)
+    Recibe cada petición HTTP. Construye la URL, configura las cabeceras CORS,
+    responde 204 a OPTIONS, busca la ruta en el router y responde 404 si no
+    existe. Si la ruta es pública, ejecuta el handler. Si es privada, valida la
+    sesión con getSessionFromRequest, autoriza con authorize y responde 401 o
+    403 cuando corresponde. Finalmente ejecuta el handler.
+
+- start()
+    Se ejecuta cuando el servidor queda escuchando. Muestra la URL de la API y
+    la ubicación del frontend.
+
+Flujo de arranque:
+
+  1. Carga la configuración.
+  2. Conecta la base de datos.
+  3. Crea el Map del router.
+  4. Registra las rutas con setupRoutes.
+  5. Crea el servidor HTTP y escucha en la IP y puerto configurados.
+
+
+2.3 backend/server/routes.js
+--------------------------------------------------------------------------------
+Define el mapa de rutas HTTP.
+
+- setupRoutes(router, config, db)
+    Registra cada ruta con router.set(path, handler).
+
+Rutas principales:
+
+  Públicas:
+    /login
+    /register
+    /api/getAvailability
+    /api/applyReservation
+    /api/inventory/list
+    /api/resources/create
+    /api/resources/delete
+    /api/calendar/reservations
+    /api/reservations/create
+
+  Privadas:
+    /log
+    /sayHello
+    /api/resources/list
+    /api/reservations/cancel
+    /api/admin/user/delete
+    /api/user/edit
+    /api/admin/group/create
+    /api/admin/group/delete
+    /api/admin/group/update
+    /api/users
+    /api/groups
+    /api/admin/permissions
+    /api/admin/endpoint/create
+    /api/admin/endpoint/delete
+
+Los alias /api/calendar/reservations y /api/reservations/create apuntan a los
+mismos handlers de disponibilidad para mantener compatibilidad.
+
+
+2.4 backend/configure/config.json
+--------------------------------------------------------------------------------
+Configuración externa del servidor y de la base de datos:
+
+- server.ip: dirección de escucha.
+- server.port: puerto HTTP.
+- server.defaultPath: ruta del frontend por defecto.
+- database.path: ruta de SQLite.
+
+
+2.5 backend/handlers
+--------------------------------------------------------------------------------
+
+2.5.1 availabilityHandler.js
+--------------------------------------------------------------------------------
+Handlers de disponibilidad y reservas.
+
+Funciones auxiliares:
+
+- isValidTime(time)
+    Valida el formato HH:MM entre 00:00 y 24:00.
+
+- readBody(req)
+    Acumula el cuerpo de la petición y lo devuelve como texto.
+
+- readJson(req)
+    Convierte el cuerpo en JSON. Si no es válido lanza BusinessError 400.
+
+- respondJson(res, statusCode, object)
+    Escribe una respuesta JSON con el código indicado.
+
+- respondError(res, error)
+    Si el error es BusinessError usa su status; en cualquier otro caso responde
+    500 y registra el error en consola.
+
+- validateResource(resource)
+    Verifica que el recurso exista en la tabla resource.
+
+- isAdmin(session)
+    Devuelve true si el usuario tiene permiso sobre /api/reservations/cancel.
+
+- whoReserves(session, indicatedName)
+    Define el nombre de la reserva: el administrador puede indicar otro nombre;
+    un usuario común reserva siempre a su propio nombre.
+
+- normalizeFinalState(blocks)
+    Valida la lista de bloques, descarta los libres, elimina duplicados por
+    dateTime y ordena el resultado.
+
+Handlers exportados:
+
+- getAvailabilityHandler(req, res)
+    Lee resource, startTime y endTime. Valida el recurso y las horas. Devuelve
+    status success con data.startTime, data.endTime, data.intervalDuration y
+    data.occupiedZone.
+
+- applyReservationHandler(req, res)
+    Recibe el estado final de bloques de un recurso. Compara con lo guardado:
+      * Bloques nuevos: requieren sesión, no pueden ser del pasado y se agregan.
+      * Bloques que faltan: requieren sesión, no pueden ser del pasado; solo el
+        administrador o el dueño de la reserva pueden liberarlos.
+      * Sin cambios: responde que no había cambios.
+    Guarda los bloques en JSON y sincroniza la tabla reservation. Si falla la
+    base de datos, restaura el JSON anterior.
+
+- releaseReservationHandler(req, res)
+    Compatibilidad para liberar bloques por lista de dateTime. Valida recurso y
+    bloques, rechaza horarios pasados, guarda el nuevo estado y elimina las
+    reservas de la base de datos.
+
+
+2.5.2 resourceHandler.js
+--------------------------------------------------------------------------------
+Handlers del inventario.
+
+Funciones auxiliares:
+
+- respondJson(res, statusCode, object)
+    Respuesta JSON genérica.
+
+- optionalText(value, name, max)
+    Devuelve null para valores vacíos y valida la longitud máxima.
+
+- readBody(req)
+    Acumula el cuerpo de la petición.
+
+Handlers:
+
+- listResourcesHandler(req, res)
+    Devuelve todos los recursos con su estado.
+
+- createResourceHandler(req, res)
+    Requiere sesión y permiso de administrador. Valida tipo y ubicación como
+    obligatorios, valida longitudes y crea el recurso. Controla duplicados de
+    número de serie.
+
+- deleteResourceHandler(req, res)
+    Requiere sesión y permiso de administrador. Valida el id, comprueba que el
+    recurso exista, elimina reservas asociadas y borra el archivo JSON de
+    bloques.
+
+
+2.5.3 editUserHandler.js
+--------------------------------------------------------------------------------
+- editUserHandler(req, res)
+    Lee id_user e id_group. Valida que sean números, asigna el usuario al grupo
+    con assignUserToGroup y devuelve el resultado.
+
+
+2.5.4 endpointsHandler.js
+--------------------------------------------------------------------------------
+- logHandler(req, res)
+    Responde el estado del endpoint /log.
+
+- sayHelloHandler(req, res)
+    Responde el estado del endpoint /sayHello.
+
+
+2.5.5 groupHandler.js
+--------------------------------------------------------------------------------
+- createGroupHandler(req, res)
+    Lee name y crea el grupo.
+
+- deleteGroupHandler(req, res)
+    Lee id y elimina el grupo junto con sus miembros y permisos.
+
+- updateGroupHandler(req, res)
+    Lee id y name y actualiza el nombre del grupo.
+
+
+2.5.6 listDataHandler.js
+--------------------------------------------------------------------------------
+- listUsersHandler(req, res)
+    Devuelve todos los usuarios.
+
+- listGroupsHandler(req, res)
+    Devuelve todos los grupos.
+
+
+2.5.7 loginHandler.js
+--------------------------------------------------------------------------------
+- loginHandler(req, res)
+    Lee username y password, llama a login() y responde 200 si las credenciales
+    son correctas. Si fallan responde 401 con exception y detail. Ante un error
+    inesperado responde 500.
+
+
+2.5.8 permissionHandler.js
+--------------------------------------------------------------------------------
+- createEndpointHandler(req, res)
+    Crea un endpoint a partir de path.
+
+- updatePermissionsHandler(req, res)
+    Busca el grupo por group_name y el endpoint por path. Si ambos existen,
+    agrega el permiso con addAccess.
+
+- deleteEndpointHandler(req, res)
+    Valida endpoint_id y elimina el endpoint y sus accesos.
+
+
+2.5.9 registerHandler.js
+--------------------------------------------------------------------------------
+- registerHandler(req, res)
+    Lee username y password y llama a register(). Responde status ok con los
+    datos del usuario creado o status error con el mensaje y código del error.
+
+
+2.5.10 userManagementHandler.js
+--------------------------------------------------------------------------------
+- deleteUserHandler(req, res)
+    Lee user_id, elimina al usuario y sus pertenencias a grupos y responde el
+    resultado.
+
+
+2.6 backend/repositories
+--------------------------------------------------------------------------------
+
+2.6.1 accessRepository.js
+--------------------------------------------------------------------------------
+- addAccess(groupId, endpointId)
+    Inserta un permiso en la tabla access usando INSERT OR IGNORE.
+
+
+2.6.2 authRepository.js
+--------------------------------------------------------------------------------
+- getUserByUsername(username)
+    Devuelve id, username y password del usuario.
+
+- getGroupsByUserId(userId)
+    Devuelve los grupos a los que pertenece un usuario.
+
+- getEndpointsByGroupId(groupId)
+    Devuelve los paths de los endpoints habilitados para un grupo.
+
+
+2.6.3 blocksRepository.js
+--------------------------------------------------------------------------------
+Persistencia de bloques en backend/data/<recurso>.json.
+
+- readBlocks(resourceId)
+    Lee el archivo JSON del recurso. Si no existe o está vacío devuelve [].
+    Si el JSON está corrupto registra el error y devuelve [].
+
+- saveBlocks(resourceId, blocks)
+    Escribe la lista de bloques con formato JSON de 4 espacios y la devuelve.
+
+- deleteBlocks(resourceId)
+    Elimina el archivo JSON del recurso si existe.
+
+
+2.6.4 endpointRepository.js
+--------------------------------------------------------------------------------
+- getEndpointIdByPath(path)
+    Devuelve el registro del endpoint o null.
+
+- createEndpoint(path)
+    Inserta el endpoint si no existe. Si ya existe devuelve un mensaje.
+
+- deleteEndpoint(endpointId)
+    Elimina primero los accesos y luego el endpoint.
+
+- getAllEndpoints()
+    Devuelve todos los endpoints.
+
+
+2.6.5 groupRepository.js
+--------------------------------------------------------------------------------
+- createGroup(groupName)
+    Inserta un grupo y devuelve id y nombre.
+
+- deleteGroup(groupId)
+    Elimina miembros, accesos y el grupo.
+
+- updateGroup(groupId, newName)
+    Actualiza el nombre del grupo.
+
+- getAllGroups()
+    Devuelve id y name de todos los grupos.
+
+- getGroupIdByName(name)
+    Devuelve { id } o null.
+
+
+2.6.6 reservationRepository.js
+--------------------------------------------------------------------------------
+Historial de reservas en la tabla reservation.
+
+- addMinutes(dateTime, minutes)
+    Suma minutos a una fecha con formato "AAAA-MM-DD HH:MM" y devuelve el mismo
+    formato.
+
+- createReservations(resourceId, userId, blocks, teacher)
+    Inserta una fila por cada bloque. Cada bloque dura 30 minutos.
+
+- insertReservations(resourceId, userId, blocks)
+    Inserta solo bloques nuevos con objeto { dateTime, teacher }.
+
+- replaceReservations(resourceId, userId, blocks)
+    Elimina las reservas del recurso y vuelve a insertar la lista recibida.
+
+- deleteReservations(resourceId, blocks)
+    Elimina las reservas que coinciden con resourceId y startDate. Devuelve la
+    cantidad eliminada.
+
+- listReservations(resourceId)
+    Lista las reservas de un recurso o todas, ordenadas por startDate.
+
+
+2.6.7 resourceRepository.js
+--------------------------------------------------------------------------------
+- getAllResources()
+    Devuelve todos los recursos con el nombre de su estado.
+
+- getResourceById(resourceId)
+    Devuelve un recurso o undefined.
+
+- insertResource(resource)
+    Inserta un recurso con INSERT OR IGNORE.
+
+- generateResourceId(type)
+    Genera un id legible y seguro a partir del tipo. Si ya existe agrega -2,
+    -3, etc.
+
+- createResource(data)
+    Crea un recurso con estado "Disponible" y devuelve el registro creado.
+
+- deleteResource(resourceId)
+    Verifica que no existan préstamos. Si existen lanza un error 409. Si no,
+    elimina reservas y recurso dentro de una transacción y devuelve la cantidad
+    de reservas eliminadas.
+
+
+2.6.8 userRepository.js
+--------------------------------------------------------------------------------
+- insertUser(username, password)
+    Hashea la contraseña con bcrypt y crea el usuario. Devuelve id y username.
+
+- deleteUser(userId)
+    Elimina las pertenencias a grupos y luego el usuario.
+
+- getAllUsers()
+    Devuelve id y username de todos los usuarios.
+
+- assignUserToGroup(userId, groupId)
+    Inserta o reemplaza la relación usuario-grupo.
+
+
+2.7 backend/usescause
+--------------------------------------------------------------------------------
+
+2.7.1 authenticate.js
+--------------------------------------------------------------------------------
+- authenticate(username, password)
+    Busca el usuario y compara la contraseña con bcrypt. Devuelve true o false.
+
+
+2.7.2 authorize.js
+--------------------------------------------------------------------------------
+- publicRoutes
+    Lista de rutas que no requieren sesión.
+
+- isPublicRoute(path)
+    Devuelve true si la ruta está en publicRoutes.
+
+- getSessionFromRequest(req)
+    Lee x-user-id y x-api-key, valida que el usuario tenga sesión activa y que
+    la apiKey coincida.
+
+- authorize(userId, endpointPath)
+    Consulta la tabla access para comprobar si el usuario, a través de sus
+    grupos, tiene permiso sobre la ruta.
+
+
+2.7.3 ScheduleManager.js
+--------------------------------------------------------------------------------
+Lógica de negocio de disponibilidad. No accede a archivos ni a la base de datos.
+
+- BusinessError
+    Error de negocio con código HTTP (por defecto 400).
+
+- constructor()
+    Define START_HOUR = 6, END_HOUR = 24 y MINUTES_PER_BLOCK = 30.
+
+- pad(num)
+    Rellena con cero a la izquierda.
+
+- formatDateTime(date)
+    Devuelve "AAAA-MM-DD HH:MM".
+
+- generateTimeBlocks(day)
+    Genera todos los bloques de 30 minutos de un día, desde las 06:00 hasta las
+    24:00. Cada bloque tiene dateTime, occupied y teacher.
+
+- applyReservation(dayBlocks, startTime, endTime, teacher)
+    Marca como ocupados los bloques que caen dentro del rango.
+
+- mergeBlocks(oldBlocks, newBlocks)
+    Fusiona bloques por dateTime; los nuevos reemplazan a los viejos.
+
+- buildNewBlocks(dateTimes, teacher)
+    Construye la grilla de cada día y devuelve solo los bloques reservados.
+
+- currentBlockStart(now)
+    Devuelve el inicio del bloque de 30 minutos que contiene a "now".
+
+- isPastBlock(dateTime, now)
+    Indica si un bloque es anterior al bloque actual.
+
+- hasPastBlock(blocks, now)
+    Indica si alguno de los bloques es del pasado.
+
+- isValidResource(resource)
+    Comprueba que el recurso exista en la base de datos.
+
+- isValidDateTime(dateTime)
+    Valida formato, fecha real (rechaza 2026-02-31), hora entre 06:00 y 24:00 y
+    múltiplos de 30 minutos.
+
+- normalizeBlocks(dateTimes)
+    Valida la lista y elimina duplicados.
+
+- checkAvailability(savedBlocks, dateTimes)
+    Devuelve disponible o el primer conflicto encontrado.
+
+- reserve(savedBlocks, dateTimes, teacher)
+    Valida disponibilidad y devuelve la lista fusionada y ordenada.
+
+- release(savedBlocks, dateTimes)
+    Quita los bloques indicados y devuelve { blocks, released }.
+
+- buildRawResponse(savedBlocks, startTime, endTime, day)
+    Devuelve los bloques ocupados para el frontend con las claves startTime,
+    endTime, intervalDuration y occupiedZone.
+
+
+2.7.4 login.js
+--------------------------------------------------------------------------------
+- login(username, password)
+    Busca el usuario, valida la contraseña con bcrypt, obtiene sus grupos y crea
+    o reactiva la sesión en userSessions. Devuelve status, result y description.
+
+
+2.7.5 register.js
+--------------------------------------------------------------------------------
+- registrationError(message, status)
+    Crea un Error con código HTTP.
+
+- register(username, password)
+    Valida tipos, longitud de usuario (3 a 30) y contraseña (mínimo 4). Verifica
+    que el usuario no exista y que exista el grupo profesor. Crea el usuario y
+    lo asigna al grupo profesor dentro de una transacción.
+
+
+2.7.6 sessions.js
+--------------------------------------------------------------------------------
+- userSessions
+    Map en memoria con las sesiones activas por id de usuario.
+
+
+2.8 backend/data
+--------------------------------------------------------------------------------
+Archivos JSON de disponibilidad por recurso:
+
+  calculadora.json
+  computadora.json
+  impresora.json
+  proyector.json
+  teclado.json
+
+Cada archivo contiene una lista de bloques con:
+
+  dateTime: fecha y hora del bloque.
+  occupied: true si está reservado.
+  teacher: nombre del docente que reservó.
+
+Los archivos se leen y escriben con blocksRepository.js.
+
+
+3. FRONTEND
+--------------------------------------------------------------------------------
+
+3.1 frontend/index.html
+--------------------------------------------------------------------------------
+Único punto de entrada. Carga los estilos w3.css y w3-theme-teal.css y define
+los Web Components:
+
+  <wc-navbar>
+  <wc-login-view>
+  <wc-register-view>
+  <wc-dashboard-view>
+
+Luego importa los módulos de las vistas principales:
+
+  js/view/WCLoginView.js
+  js/view/WCRegisterView.js
+  js/view/WCNavbarView.js
+  js/view/WCDashboardView.js
+  js/view/WCAvailabilityView.js
+  js/view/WCInventoryView.js
+  js/view/WCHelpView.js
+
+
+3.2 frontend/js/config.js
+--------------------------------------------------------------------------------
+Constantes compartidas:
+
+- API_URL: URL base del backend.
+- ENDPOINTS: rutas de login, disponibilidad, reservas, inventario y recursos.
+- RESOURCES: recursos iniciales.
+- GRID_START_HOUR: hora inicial de la grilla.
+- GRID_END_HOUR: hora final de la grilla.
+- DEFAULT_INTERVAL_DURATION: duración por bloque.
+- APP_NAME: nombre visible de la aplicación.
+- STATUS_REFRESH_MS: intervalo de refresco del dashboard.
+- MENU: opciones visibles del menú. Incluye Inicio, Disponibilidad, Inventario,
+  Ayuda y Mantenimiento. La opción Préstamos fue retirada.
+
+
+3.3 frontend/js/api.js
+--------------------------------------------------------------------------------
+- callRpc(endpoint, data)
+    Realiza un POST al backend, agrega las cabeceras de sesión, traduce 401 y
+    403 a mensajes de error y devuelve siempre un objeto con status y message o
+    el JSON de respuesta.
+
+
+3.4 frontend/js/session.js
+--------------------------------------------------------------------------------
+- getSession()
+    Lee userId, apiKey, username y groups de localStorage. Devuelve null si no
+    hay sesión. Devuelve { userId, apiKey, name, role, groups }.
+
+- saveSession(result)
+    Guarda los datos de sesión y emite el evento session-change.
+
+- authHeaders()
+    Devuelve las cabeceras x-user-id y x-api-key.
+
+- closeSession()
+    Borra la sesión de localStorage y emite session-change.
+
+
+3.5 frontend/js/resources.js
+--------------------------------------------------------------------------------
+- loadResources()
+    Consulta el inventario y actualiza la lista RESOURCES con los recursos
+    existentes. Mantiene el orden original y agrega los nuevos al final. Si el
+    servidor falla, devuelve la lista actual.
+
+
+3.6 frontend/js/shadow.js
+--------------------------------------------------------------------------------
+- attachViewShadow(host)
+    Crea el Shadow DOM de una vista y carga las hojas de estilo w3.css y
+    w3-theme-teal.css.
+
+
+3.7 frontend/js/controller
+--------------------------------------------------------------------------------
+
+3.7.1 WCDashboardController.js
+--------------------------------------------------------------------------------
+- constructor(view, model)
+    Guarda vista y modelo y enlaza los métodos de carga y cambio de hash.
+
+- start()
+    Carga el estado inicial, registra el refresco automático y escucha
+    hashchange.
+
+- stop()
+    Cancela el timer y quita el listener.
+
+- navigate(href)
+    Cambia el hash o vuelve a procesar el actual.
+
+- onHashChange()
+    Procesa el cambio de pantalla y recarga estados al volver al inicio.
+
+- showAuthScreen(hash)
+    Muestra login o registro y oculta el dashboard.
+
+- hideAuthScreens()
+    Oculta login y registro y muestra el dashboard.
+
+- handleHashChange()
+    Resuelve la navegación: login, registro, inventario, disponibilidad o inicio.
+
+- loadStates()
+    Actualiza primero la lista de recursos y luego consulta sus estados.
+
+- loadStatesNow()
+    Consulta la disponibilidad del día para cada recurso y envía los estados a
+    la vista.
+
+
+3.7.2 WCAvailabilityController.js
+--------------------------------------------------------------------------------
+- constructor(view, model)
+    Guarda vista y modelo.
+
+- syncModelFromInputs(data)
+    Copia resource, day, startTime y endTime del formulario al modelo.
+
+- isGridOutdated()
+    Indica si el recurso o el día del formulario no coinciden con la grilla.
+
+- warnOutdatedGrid()
+    Recarga la grilla y avisa que hay que elegir bloques de nuevo.
+
+- handleRefresh()
+    Recarga la disponibilidad.
+
+- handleVerify()
+    Ejecuta la verificación de disponibilidad.
+
+- loadAvailability(result)
+    Sincroniza el modelo, valida el día, limpia la selección y consulta
+    getAvailability. Genera la grilla, cruza los ocupados y renderiza.
+
+- handleBlockClick(event)
+    Valida sesión y bloque pasado, selecciona el bloque, actualiza botones y
+    muestra mensajes según el tipo de selección.
+
+- canReleaseSelection()
+    Permite liberar al administrador o al dueño de todas las reservas elegidas.
+
+- handleClear()
+    Limpia la selección y vuelve a renderizar.
+
+- handleApply()
+    Valida sesión, actualización de grilla, rango y disponibilidad. Pide el
+    nombre del docente si es administrador, aplica la reserva en el modelo y
+    envía el estado final con applyReservation.
+
+- handleRelease()
+    Valida actualización, selección ocupada y permisos. Confirma la liberación,
+    actualiza el modelo y envía el estado final.
+
+
+3.7.3 WCInventoryController.js
+--------------------------------------------------------------------------------
+- constructor(view, model)
+    Guarda vista y modelo.
+
+- loadResources()
+    Consulta el inventario y luego el estado de reservas de cada recurso.
+
+- handleCreate(event)
+    Valida tipo y ubicación, envía el recurso al backend y recarga la lista.
+
+- handleDelete(resource)
+    Confirma la eliminación, llama al backend y recarga la lista.
+
+- loadReservationStates(resources)
+    Construye una consulta de disponibilidad por recurso.
+
+- buildReservationRequest(resource, today)
+    Consulta la disponibilidad y devuelve el recurso con la propiedad reserved.
+
+- hasReservationOnDay(blocks, day)
+    Indica si hay algún bloque reservado en el día indicado.
+
+- withReservation(resource, reserved)
+    Devuelve una copia del recurso con la propiedad reserved.
+
+
+3.7.4 WCLoginController.js
+--------------------------------------------------------------------------------
+- constructor(view, model)
+    Guarda vista y modelo.
+
+- start()
+    Oculta el formulario al iniciar.
+
+- handleSubmit(event)
+    Valida credenciales, llama al modelo, guarda la sesión y recarga la pantalla
+    al iniciar sesión correctamente.
+
+- handleLogout()
+    Cierra la sesión y recarga la pantalla.
+
+
+3.7.5 WCRegisterController.js
+--------------------------------------------------------------------------------
+- constructor(view, model)
+    Guarda vista y modelo.
+
+- handleSubmit(event)
+    Valida usuario, contraseña y repetición. Llama al modelo y muestra el
+    resultado. Si el registro es correcto redirige al login.
+
+
+3.8 frontend/js/model
+--------------------------------------------------------------------------------
+
+3.8.1 WCDashboardModel.js
+--------------------------------------------------------------------------------
+- constructor()
+    Inicializa la lista de estados.
+
+- pad(num)
+    Rellena con cero.
+
+- today()
+    Devuelve la fecha actual "AAAA-MM-DD".
+
+- currentBlock()
+    Devuelve el bloque actual de 30 minutos o null antes de las 06:00.
+
+- calculateState(resource, occupiedZone)
+    Filtra los bloques de hoy, busca el bloque actual y devuelve
+    { resource, status, teacher, todayBlocks }. status puede ser free, closed,
+    occupied o error.
+
+- disconnectedState(resource)
+    Devuelve el estado error para un recurso.
+
+- setStates(states)
+    Guarda los estados y emite states-changed.
+
+
+3.8.2 WCAvailabilityModel.js
+--------------------------------------------------------------------------------
+- constructor()
+    Inicializa recurso, día, rango, duración, bloques, selección y zona ocupada.
+
+- setResource(resource)
+- setDay(day)
+- setRange(startTime, endTime)
+    Actualizan los datos del formulario.
+
+- pad(num)
+    Rellena con cero.
+
+- today()
+    Devuelve la fecha actual.
+
+- formatDateTime(date)
+    Devuelve "AAAA-MM-DD HH:MM".
+
+- currentBlockStart()
+    Devuelve el inicio del bloque actual.
+
+- generateGrid()
+    Genera los bloques del día y marca los pasados.
+
+- setOccupiedZone(occupiedZone)
+    Guarda la zona ocupada recibida del backend.
+
+- crossOccupied()
+    Cruza la zona ocupada con la grilla local.
+
+- visibleBlocks()
+    Filtra los bloques según el rango horario elegido.
+
+- toggleSelection(dateTime)
+    Agrega o quita un bloque de la selección.
+
+- selectBlock(dateTime)
+    Implementa la selección en dos pasos: start, end o before.
+
+- selectionOwnedBy(name)
+    Indica si todos los bloques seleccionados fueron reservados por ese nombre.
+
+- clearSelection()
+    Limpia la selección y emite selection-cleared.
+
+- selectedRange()
+    Calcula el rango startTime/endTime de la selección.
+
+- selectionType()
+    Devuelve empty, free, occupied o mixed.
+
+- findBlock(dateTime)
+    Busca un bloque por fecha y hora.
+
+- checkAvailability(startTime, endTime)
+    Indica si el rango está libre o devuelve el conflicto.
+
+- applyReservation(startTime, endTime, teacher)
+    Marca los bloques del rango como ocupados.
+
+- releaseBlock(dateTime)
+    Libera un bloque.
+
+- releaseSelection()
+    Libera todos los bloques seleccionados.
+
+- occupiedOfDay()
+    Devuelve los bloques ocupados del día visible.
+
+- mergeBlocks(oldBlocks, newBlocks)
+    Fusiona bloques por dateTime y ordena.
+
+- finalStateToSave()
+    Combina los bloques ocupados de otros días con los del día actual para
+    enviar el estado final completo al backend.
+
+
+3.8.3 WCInventoryModel.js
+--------------------------------------------------------------------------------
+- constructor()
+    Inicializa la lista de recursos.
+
+- setResources(resources)
+    Guarda la lista y emite resources-changed.
+
+- getResources()
+    Devuelve la lista.
+
+- pad(number)
+    Rellena con cero.
+
+- today()
+    Devuelve la fecha actual.
+
+
+3.8.4 WCLoginModel.js
+--------------------------------------------------------------------------------
+- constructor()
+    Carga la sesión actual.
+
+- authenticate(username, password)
+    Envía las credenciales a /login y devuelve { ok, data }.
+
+- saveSession(result)
+    Guarda la sesión y emite session-saved.
+
+- logout()
+    Cierra la sesión y emite session-closed.
+
+- getSession()
+    Devuelve la sesión actual.
+
+
+3.8.5 WCRegisterModel.js
+--------------------------------------------------------------------------------
+- constructor()
+    Inicializa el modelo.
+
+- register(username, password)
+    Envía las credenciales a /register y devuelve { ok, data }.
+
+
+3.9 frontend/js/view
+--------------------------------------------------------------------------------
+
+3.9.1 WCDashboardView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Crea el Shadow DOM, los estilos de las tarjetas, el título, el subtítulo y
+    las secciones. Instancia modelo y controlador.
+
+- buildContent()
+    Crea el contenedor de contenido, la sección de inicio, los módulos y los
+    estados.
+
+- buildModules()
+    Genera las tarjetas de los módulos a partir de MENU.
+
+- buildStates()
+    Crea el mensaje y el contenedor de la tabla de estados.
+
+- connectedCallback()
+    No asigna manejadores adicionales.
+
+- disconnectedCallback()
+    Detiene el controlador.
+
+- show() / hide()
+    Muestran u ocultan la vista.
+
+- showHome()
+    Vuelve a mostrar la sección de inicio.
+
+- loadView(tagName)
+    Carga una vista hija dentro del contenedor.
+
+- showMessage(text, isError)
+    Muestra un mensaje de estado.
+
+- clearTable()
+    Limpia la tabla.
+
+- renderStates(states)
+    Construye la tabla de estado de los recursos con recurso, estado actual,
+    docente y cantidad de bloques reservados hoy.
+
+
+3.9.2 WCAvailabilityView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Construye controles, acciones y tabla. Instancia modelo y controlador,
+    enlaza manejadores y carga la disponibilidad.
+
+- refreshResourceOptions()
+    Sincroniza el selector con RESOURCES.
+
+- connectedCallback()
+    Asigna los eventos de botones, selects e inputs y el evento block-click.
+
+- disconnectedCallback()
+    Quita todos los manejadores.
+
+- buildControls()
+    Crea recurso, día, hora desde, hora hasta y botón Verificar.
+
+- buildActions()
+    Crea los botones Aplicar reserva, Liberar selección y Limpiar selección.
+
+- buildTable()
+    Crea el contenedor de la tabla.
+
+- showMessage(text) / showError(text) / showSuccess(text)
+    Cambian el mensaje y su color.
+
+- updateSelectionSpan(range, done)
+    Muestra el rango seleccionado.
+
+- buildLoginNotice()
+    Muestra un aviso cuando no hay sesión.
+
+- updateActionButtons(type)
+    Decide qué botones se ven según el tipo de selección.
+
+- clearTable()
+    Limpia la tabla.
+
+- getFormData()
+    Devuelve resource, day, startTime y endTime.
+
+- render(blocks, selection, rangeDone)
+    Dibuja la tabla de bloques con hora, estado y docente. Los bloques pasados
+    se muestran atenuados y no se pueden modificar.
+
+
+3.9.3 WCInventoryView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Construye título, mensaje, botón de actualización y tabla. Instancia modelo
+    y controlador.
+
+- connectedCallback()
+    Asigna el botón de actualización y, si el usuario es administrador, el
+    formulario de alta.
+
+- disconnectedCallback()
+    Quita los manejadores.
+
+- buildAddForm()
+    Crea el formulario de alta solo para administradores.
+
+- buildField(labelText, placeholder)
+    Crea un campo de texto con etiqueta.
+
+- toggleAddForm()
+    Muestra u oculta el formulario.
+
+- getNewResource()
+    Devuelve los valores del formulario.
+
+- resetAddForm()
+    Limpia el formulario.
+
+- setAddLoading(isLoading)
+    Deshabilita el botón y cambia su texto mientras guarda.
+
+- showAddError(text) / showAddSuccess(text)
+    Muestran mensajes del formulario.
+
+- showMessage(text) / showError(text)
+    Muestran mensajes generales.
+
+- clearTable()
+    Limpia la tabla.
+
+- countReserved(resources)
+    Cuenta los recursos reservados.
+
+- render(resources)
+    Dibuja la tabla del inventario y el botón Eliminar para administradores.
+
+
+3.9.4 WCLoginView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Construye el formulario de login, los enlaces y los mensajes.
+
+- connectedCallback()
+    Asigna el evento submit.
+
+- disconnectedCallback()
+    Quita el evento submit.
+
+- getCredentials()
+    Devuelve username y password.
+
+- setLoading(isLoading)
+    Cambia el estado del botón.
+
+- clearMessage()
+    Limpia el mensaje.
+
+- showError(text)
+    Muestra un error.
+
+- show() / hide()
+    Muestran u ocultan la vista.
+
+
+3.9.5 WCNavbarView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Crea el Shadow DOM, el contenedor de la barra y la dibuja.
+
+- connectedCallback()
+    Escucha session-change y hashchange.
+
+- disconnectedCallback()
+    Quita los listeners.
+
+- render()
+    Dibuja la barra con logo, menú, usuario, cerrar sesión o iniciar sesión y
+    registrarse según la sesión actual.
+
+- handleLogout()
+    Cierra la sesión y recarga.
+
+
+3.9.6 WCRegisterView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Construye el formulario de registro.
+
+- connectedCallback()
+    Asigna el evento submit.
+
+- disconnectedCallback()
+    Quita el evento submit.
+
+- getCredentials()
+    Devuelve username, password y passwordRepeat.
+
+- setLoading(isLoading)
+    Cambia el estado del botón.
+
+- showError(text) / showSuccess(text)
+    Muestran mensajes de error o éxito.
+
+
+3.9.7 WCRequestsView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Construye la vista del módulo futuro de pedidos.
+
+- connectedCallback() / disconnectedCallback()
+    No realizan acciones por el momento.
+
+
+3.9.8 WCHelpView.js
+--------------------------------------------------------------------------------
+- constructor()
+    Construye la sección Ayuda con el título, el subtítulo y las preguntas
+    frecuentes. Es una vista estática, sin modelo ni controlador propios.
+
+- buildIntro()
+    Crea el panel introductorio que explica el objetivo de la guía.
+
+- buildFaqs()
+    Arma las preguntas frecuentes sobre cómo reservar, requisitos, acciones
+    permitidas y prohibidas, cancelación, roles y significados de los estados.
+
+- buildClosing()
+    Crea el panel final con el resumen de condiciones para reservar.
+
+- buildFaq(question, elements)
+    Crea cada pregunta como un elemento details con su respuesta.
+
+- paragraph(text)
+    Devuelve un párrafo con el texto indicado.
+
+- list(items, ordered)
+    Devuelve una lista con viñetas u ordenada según el parámetro.
+
+
+4. TESTING
+--------------------------------------------------------------------------------
+
+4.1 testing/setup.js
+--------------------------------------------------------------------------------
+- createTestDatabase()
+    Crea una base SQLite en memoria con las tablas users, resources y loans
+    para las pruebas.
+
+4.2 testing/unit/loans.test.js
+--------------------------------------------------------------------------------
+Pruebas unitarias de préstamos:
+- Registro correcto de un préstamo.
+- Consulta con JOIN de usuario y recurso.
+
+4.3 testing/unit/resources.test.js
+--------------------------------------------------------------------------------
+Pruebas unitarias de recursos:
+- Inserción correcta de un recurso.
+- Consulta de recursos disponibles.
+
+4.4 testing/unit/users.test.js
+--------------------------------------------------------------------------------
+Pruebas unitarias de usuarios:
+- Registro correcto de un usuario.
+- Rechazo de correo duplicado.
+
+4.5 testing/integration/loans.api.test.js
+--------------------------------------------------------------------------------
+Prueba de integración con un servidor HTTP temporal:
+- POST /api/loans responde 201 y devuelve loanId.
+
+4.6 testing/integration/resources.api.test.js
+--------------------------------------------------------------------------------
+Prueba de integración con un servidor HTTP temporal:
+- GET /api/resources responde 200 y devuelve un arreglo con el recurso.
+
+Estado actual: las 8 pruebas existentes pasan correctamente y no se
+modificaron.
+
+
+5. RELEASE
+--------------------------------------------------------------------------------
+
+5.1 release/init-db.mjs
+--------------------------------------------------------------------------------
+Prepara la base de datos de producción.
+
+Funciones y acciones:
+- Resuelve la raíz del proyecto a partir de la ubicación del script.
+- Abre db.sqlite3 en la raíz.
+- Elimina las tablas existentes.
+- Crea user, group, members, endpoint, access, status, resource, loan y
+  reservation.
+- Inserta 11 estados.
+- Inserta los 4 recursos iniciales.
+- Inserta los 4 grupos.
+- Crea el usuario admin con contraseña admin.
+- Asigna admin al grupo admin.
+- Registra los endpoints de la API y asigna los permisos al grupo admin.
+
+5.2 release/setup.ps1 y release/setup.sh
+--------------------------------------------------------------------------------
+Preparan el entorno:
+- Verifican la versión de Node.js.
+- Instalan las dependencias con npm install.
+- Ejecutan release/init-db.mjs.
+
+5.3 release/deploy.ps1 y release/deploy.sh
+--------------------------------------------------------------------------------
+Despliegan en producción:
+- Ejecutan setup.
+- Corren los tests unitarios y de integración.
+- Crean la carpeta dist.
+- Copian backend, frontend, package.json, package-lock.json y los scripts de
+  release.
+- Instalan dependencias de producción con npm install --omit=dev.
+- Inicializan la base de datos de producción.
+- Arrancan el backend, salvo que se use -NoStart o NO_START=1.
+
+5.4 release/serve-frontend.mjs
+--------------------------------------------------------------------------------
+Servidor estático opcional para el frontend.
+- Recibe como argumento la carpeta a servir (por defecto frontend).
+- Usa PORT y HOST del entorno, con 8080 y 127.0.0.1 por defecto.
+- Resuelve rutas, evita salir del directorio público y devuelve el tipo MIME
+  correspondiente.
+
+5.5 release/README.md
+--------------------------------------------------------------------------------
+Instrucciones de uso de los scripts en Windows y Linux y datos del entorno de
+producción.
+
+
+6. BASE DE DATOS
+--------------------------------------------------------------------------------
+Tablas principales:
+
+- user: usuarios con username único y password hasheada.
+- group: grupos de permisos.
+- members: relación usuario-grupo.
+- endpoint: rutas protegidas.
+- access: relación grupo-endpoint.
+- status: estados de gestión y conservación.
+- resource: inventario de recursos.
+- loan: préstamos.
+- reservation: historial de reservas por bloque.
+
+Relaciones:
+- Un usuario puede pertenecer a varios grupos.
+- Un grupo puede tener acceso a varios endpoints.
+- Un recurso puede tener varias reservas y varios préstamos.
+- Cada reserva pertenece a un recurso y a un usuario.
+
+
+7. EJECUCIÓN
+--------------------------------------------------------------------------------
+
+Preparar el entorno:
+
+  node release/init-db.mjs
+  npm install
+
+Iniciar el backend:
+
+  node backend/server/main.mjs
+
+Servir el frontend:
+
+  node release/serve-frontend.mjs frontend
+
+Abrir:
+
+  http://127.0.0.1:8080
+
+Usuario inicial:
+
+  Usuario: admin
+  Contraseña: admin
+
+
+8. PRUEBAS
+--------------------------------------------------------------------------------
+
+Ejecutar todas las pruebas:
+
+  node --test testing/unit/*.test.js testing/integration/*.test.js
+
+Resultado esperado:
+
+  8 pruebas aprobadas.
+
+
+9. OBSERVACIONES FINALES
+--------------------------------------------------------------------------------
+- La lógica de negocio no fue modificada; solo se tradujeron identificadores,
+  archivos y nombres de funciones al inglés.
+- Los textos visibles de la interfaz permanecen en español.
+- Los archivos de prueba existentes no se modificaron porque ya pasaban.
+- Las fechas y horas de los bloques usan el formato "AAAA-MM-DD HH:MM".
+- Los bloques se guardan en backend/data/<recurso>.json y en la tabla
+  reservation.
+- Para producción se recomienda servir el frontend con Apache o Nginx y
+  mantener el backend detrás de un proxy.
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================

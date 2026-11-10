@@ -3,7 +3,14 @@ import { userSessions } from "./sessions.js";
 
 const publicRoutes =[
     '/login',
-    '/register'
+    '/register',
+    '/api/calendar/reservations',
+    '/api/reservations/create',
+    '/api/inventory/list',
+    '/api/getAvailability',
+    '/api/applyReservation',
+    '/api/resources/create',
+    '/api/resources/delete'
 ];
 
 export function isPublicRoute(path)
@@ -40,7 +47,7 @@ export function getSessionFromRequest(req)
 
     return session;
 }
-export function authorize(id_user, endpointPath)
+export function authorize(userId, endpointPath)
 {
     const sql = `
         SELECT count(*) as total
@@ -57,7 +64,7 @@ export function authorize(id_user, endpointPath)
 
         const row =
             stmt.get(
-                id_user,
+                userId,
                 endpointPath
             );
 
@@ -66,7 +73,7 @@ export function authorize(id_user, endpointPath)
     catch (err)
     {
         console.error(
-            'Error consultando permisos:',
+            'Error querying permissions:',
             err
         );
 

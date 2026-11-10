@@ -1,6 +1,6 @@
 import { getGroupsByUserId } from '../repositories/authRepository.js';
 import { deleteUser } from '../repositories/userRepository.js';
-// puede elimiar cualquier usuario 
+
 export function deleteUserHandler(req, res) {
     let body = '';
 
@@ -33,4 +33,3 @@ export function deleteUserHandler(req, res) {
 
     });
 }
-

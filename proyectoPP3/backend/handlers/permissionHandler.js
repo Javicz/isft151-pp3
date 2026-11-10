@@ -49,10 +49,10 @@ export function updatePermissionsHandler(req, res) {
     req.on('end', function(){
       try {
         const data = JSON.parse(body);
-        const group_name = data.group_name;
+        const groupName = data.group_name;
         const endpoint = data.endpoint;
 
-        const group = getGroupIdByName(group_name);
+        const group = getGroupIdByName(groupName);
 
         if (!group) {
 
@@ -131,6 +131,7 @@ export function deleteEndpointHandler(req, res) {
           success: false,
           error: error.message
         }));
+
       }
     });
 }

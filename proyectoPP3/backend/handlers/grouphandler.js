@@ -42,7 +42,6 @@ export function deleteGroupHandler(req, res) {
     });
 }
 
-//funcion que no probe aun
 export function updateGroupHandler(req, res) {
     let body = '';
     req.on('data', function(chunk){

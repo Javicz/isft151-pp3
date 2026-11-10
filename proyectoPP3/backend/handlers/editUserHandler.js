@@ -1,5 +1,4 @@
-import { group } from "node:console";
-import { assignUsertoGroup } from "../repositories/userRepository.js";
+import { assignUserToGroup } from "../repositories/userRepository.js";
 
 export function editUserHandler(req, res) {
     let body = '';
@@ -10,8 +9,7 @@ export function editUserHandler(req, res) {
     req.on('end', function(){
       const data = JSON.parse(body);
       const userId = parseInt(data.id_user);
-      const groupId = parseInt(data.id_group); 
-      
+      const groupId = parseInt(data.id_group);
 
           if (isNaN(userId) || isNaN(groupId)) {
             res.writeHead(400, {
@@ -24,8 +22,8 @@ export function editUserHandler(req, res) {
             }));
           }
 
-    const result = assignUsertoGroup(userId, groupId);
-    
+    const result = assignUserToGroup(userId, groupId);
+
         res.writeHead(200, {'Content-Type': 'application/json'});
 
         res.end(JSON.stringify({

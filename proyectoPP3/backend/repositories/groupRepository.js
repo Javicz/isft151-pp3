@@ -23,7 +23,7 @@ export function deleteGroup(groupId) {
 
   const sql2 = `DELETE FROM \`group\` WHERE id = ?`;
   const stmt2 = db.prepare(sql2);
-  
+
   const result = stmt2.run(groupId);
   return{
     message: 'grupo eliminado',
@@ -49,7 +49,6 @@ export function getAllGroups() {
   return stmt.all();
 }
 
-// repositories/groupRepository.js
 export function getGroupIdByName(name) {
     const sql = `SELECT id FROM \`group\` WHERE name = ?`;
     const stmt = db.prepare(sql);

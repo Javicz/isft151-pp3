@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import db from '../server/database.js';
 
-export function insertarUsuario(username, password)
+export function insertUser(username, password)
 {
     const hashedPassword = bcrypt.hashSync(password, 10);
 
@@ -13,12 +13,12 @@ export function insertarUsuario(username, password)
     const stmt = db.prepare(sql);
 
     const result = stmt.run(username, hashedPassword);
-    
+
     return {
         id: result.lastInsertRowid,
         username
     };
-    
+
 }
 
 export function deleteUser(userId) {
@@ -46,7 +46,7 @@ export function getAllUsers() {
     return rows;
 }
 
-export function assignUsertoGroup(userId, groupId){
+export function assignUserToGroup(userId, groupId){
     const sql = `
         INSERT OR REPLACE INTO members (id_user, id_group)
         VALUES (?, ?)

@@ -4,18 +4,17 @@ import { URL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { resolve } from 'node:path';
-import { userSessions } from '../usescause/sessions.js';
 import { authorize, isPublicRoute, getSessionFromRequest } from '../usescause/authorize.js'
 
-function default_config() 
+function defaultConfig()
 {
-    const config = 
+    const config =
     {
-        server: 
+        server:
         {
             ip: '127.0.0.1',
             port: 3000,
-            default_path: '../frontend/default.html'
+            defaultPath: '../frontend/default.html'
         },
         database:
         {
@@ -26,26 +25,26 @@ function default_config()
     return config;
 }
 
-function load_config() 
+function loadConfig()
 {
     let config = null;
-    try 
+    try
     {
-        const data = readFileSync('../config.json', 'utf-8');
+        const data = readFileSync(new URL('../configure/config.json', import.meta.url), 'utf-8');
         config = JSON.parse(data);
-        console.log("Configuración cargada correctamente.");
-    } 
-    catch (error) 
+        console.log("Configuration loaded successfully.");
+    }
+    catch (error)
     {
-        console.error("Error cargando config.json. Usando valores por defecto.");
-        config = default_config();
+        console.error("Error loading config.json. Using default values.");
+        config = defaultConfig();
     }
     return config;
 }
 
-let config = load_config();
+let config = loadConfig();
 
-function connect_db(path) 
+function connectDb(path)
 {
   const dbPath = resolve(path);
 
@@ -54,15 +53,13 @@ function connect_db(path)
   return db;
 }
 
-// Uso
-const db = connect_db( config.database.path );
+const db = connectDb( config.database.path );
 
 let router = new Map();
-// Después de crear el router:
 setupRoutes(router, config, db);
 
 
-async function request_dispatcher(req, res)
+async function requestDispatcher(req, res)
 {
     const url = new URL(req.url, 'http://' + config.server.ip);
 
@@ -102,13 +99,7 @@ async function request_dispatcher(req, res)
         return;
     }
 
-    console.log('PATH:', path);
-    console.log('SESSION:', session);
-    console.log('SESSIONS:', userSessions);
-
     const authorized = authorize(session.userId, path);
-
-    console.log('AUTHORIZED:', authorized);
 
     if (!authorized)
     {
@@ -123,12 +114,12 @@ async function request_dispatcher(req, res)
 
 function start()
 {
-	console.log('Servidor ejecutandose...');
+    console.log('Server running...');
     console.log(`API: http://${config.server.ip}:${config.server.port}`);
 
     console.log('Frontend (Apache): http://localhost');
 }
 
-let server = createServer(request_dispatcher);
+let server = createServer(requestDispatcher);
 
 server.listen(config.server.port, config.server.ip, start);

@@ -1,25 +1,35 @@
-import { register_handler } from '../handlers/registerhandlers.js';
-import { login_handler } from '../handlers/loginhandlers.js';
+import { registerHandler } from '../handlers/registerHandler.js';
+import { loginHandler } from '../handlers/loginHandler.js';
 import { login } from '../usescause/login.js';
 import { register } from '../usescause/register.js';
-import { insertarUsuario } from '../repositories/userRepository.js';
+import { insertUser } from '../repositories/userRepository.js';
 import { deleteUserHandler } from '../handlers/userManagementHandler.js';
 import { editUserHandler } from '../handlers/editUserHandler.js';
-import { createGroupHandler, deleteGroupHandler, updateGroupHandler } from '../handlers/grouphandler.js';
-import { listUsersHandler, listGroupsHandler } from '../handlers/listdatahandler.js';
+import { createGroupHandler, deleteGroupHandler, updateGroupHandler } from '../handlers/groupHandler.js';
+import { listUsersHandler, listGroupsHandler } from '../handlers/listDataHandler.js';
 import { updatePermissionsHandler, createEndpointHandler, deleteEndpointHandler } from '../handlers/permissionHandler.js';
-import { say_hello_handler, log_handler } from '../handlers/endpoints.handler.js';
+import { logHandler, sayHelloHandler } from '../handlers/endpointsHandler.js';
+import { getAvailabilityHandler, applyReservationHandler, releaseReservationHandler } from '../handlers/availabilityHandler.js';
+import { listResourcesHandler, createResourceHandler, deleteResourceHandler } from '../handlers/resourceHandler.js';
 
 export function setupRoutes(router, config, db) {
-  //Publicas
-  router.set('/login', login_handler);
-  router.set('/register', register_handler);
+  router.set('/login', loginHandler);
+  router.set('/register', registerHandler);
 
-  //endpoints
-  router.set('/log', log_handler);
-  router.set('/sayHello', say_hello_handler);
+  router.set('/log', logHandler);
+  router.set('/sayHello', sayHelloHandler);
 
-  // Privadas
+  router.set('/api/getAvailability', getAvailabilityHandler);
+  router.set('/api/applyReservation', applyReservationHandler);
+  router.set('/api/calendar/reservations', getAvailabilityHandler);
+  router.set('/api/reservations/create', applyReservationHandler);
+  router.set('/api/reservations/cancel', releaseReservationHandler);
+
+  router.set('/api/inventory/list', listResourcesHandler);
+  router.set('/api/resources/list', listResourcesHandler);
+  router.set('/api/resources/create', createResourceHandler);
+  router.set('/api/resources/delete', deleteResourceHandler);
+
   router.set('/api/admin/user/delete', deleteUserHandler);
   router.set('/api/user/edit', editUserHandler);
   router.set('/api/admin/group/create', createGroupHandler);

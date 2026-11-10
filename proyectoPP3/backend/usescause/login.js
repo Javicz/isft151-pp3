@@ -1,5 +1,5 @@
 import { getUserByUsername, getGroupsByUserId } from '../repositories/authRepository.js';
-import { userSessions } from '../usescause/sessions.js';
+import { userSessions } from './sessions.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -47,7 +47,7 @@ export function login(username, password){
             session.status = 'enabled';
         }
 
-        console.log(`Login correcto: ${user.username}`);
+        console.log(`Login successful: ${user.username}`);
 
         return {
             status: true,
